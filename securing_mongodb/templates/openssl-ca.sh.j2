@@ -1,0 +1,19 @@
+#!/bin/sh
+
+#Create the test CA key file mongodb-test-ca.key
+openssl genrsa -out /home/{{ ansible_user }}/test/mongodb-test-ca.key 4096
+
+# Create the CA certificate mongod-test-ca.crt using the generated key file
+openssl req -new -x509 -days 1826 -key /home/{{ ansible_user }}/test/mongodb-test-ca.key -out /home/{{ ansible_user }}/test/mongodb-test-ca.crt -config /home/{{ ansible_user }}/test/openssl-ca.cnf
+
+# Create the private key for the intermediate certificate.
+openssl genrsa -out /home/{{ ansible_user }}/test/mongodb-test-ia.key 4096
+
+# Create the certificate signing request for the intermediate certificate
+openssl req -new -key /home/{{ ansible_user }}/test/mongodb-test-ia.key -out /home/{{ ansible_user }}/test/mongodb-test-ia.csr -config /home/{{ ansible_user }}/test/openssl-ca.cnf
+
+# Create the intermediate certificate mongodb-test-ia.crt
+openssl x509 -sha256 -req -days 730 -in /home/{{ ansible_user }}/test/mongodb-test-ia.csr -CA /home/{{ ansible_user }}/test/mongodb-test-ca.crt -CAkey /home/{{ ansible_user }}/test/mongodb-test-ca.key -set_serial 01 -out /home/{{ ansible_user }}/test/mongodb-test-ia.crt -extfile /home/{{ ansible_user }}/test/openssl-ca.cnf -extensions v3_ca
+
+# Create the test CA PEM file from the test CA certificate mongod-test-ca.crt and test intermediate certificate mongodb-test-ia.crt
+cat mongodb-test-ia.crt mongodb-test-ca.crt > test-ca.pem

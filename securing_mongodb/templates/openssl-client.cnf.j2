@@ -1,0 +1,41 @@
+# NOT FOR PRODUCTION USE. OpenSSL configuration file for testing.
+
+[ req ]
+default_bits = 4096
+default_keyfile = TestClient.pem
+default_md = sha256
+distinguished_name = req_dn
+req_extensions = v3_req
+
+
+[ v3_req ]
+subjectKeyIdentifier  = hash
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+nsComment = "OpenSSL Generated Certificate"
+extendedKeyUsage  = serverAuth, clientAuth
+
+
+[ req_dn ]
+countryName = NP
+countryName_default = NP
+countryName_min = 2
+countryName_max = 2
+
+stateOrProvinceName = Bagmati
+stateOrProvinceName_default = Bagmati
+stateOrProvinceName_max = 64
+
+localityName = Kathmandu
+localityName_default = Kathmandu
+localityName_max = 64
+
+organizationName = Yaman Lab
+organizationName_default = Yaman Lab
+organizationName_max = 64
+
+organizationalUnitName = Security
+organizationalUnitName_default = Security
+organizationalUnitName_max = 64
+commonName = Yaman Singh Rana
+commonName_max = 64

@@ -1,0 +1,2 @@
+MONGODB_CREDS: "genieacs:GQzuBVEw0bT22Z962XZsVD8"
+MONGODB_URL: "mongodb://{{ MONGODB_CREDS }}@{{ ansible_host }}:27017/genieacs?tls=true&tlsCertificateKeyFile=/opt/genieacs/ssl/mongodb-client.pem&tlsCAFile=/opt/genieacs/ssl/mongodb-server-ca.pem"

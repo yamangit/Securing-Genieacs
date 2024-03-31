@@ -1,0 +1,60 @@
+- name: Update the APT Cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Dependency
+  ansible.builtin.apt:
+    update_cache: true
+    name:
+      - gnupg
+      - curl
+      - python3-pip
+      - net-tools
+    state: present
+
+- name: Import Mongodb GPG Key
+  ansible.builtin.apt_key:
+    keyring: /etc/apt/trusted.gpg.d/mongodb.gpg
+    state: present
+    url: "https://pgp.mongodb.com/server-{{ MONGODB_VERSION }}.asc"
+
+- name: Add MongoDB Repository
+  ansible.builtin.apt_repository:
+    repo: "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ MONGODB_VERSION }} multiverse"
+    state: present
+    filename: mongodb
+
+- name: Update the APT Cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Mongodb
+  ansible.builtin.apt:
+    update_cache: true
+    name:
+      - mongodb-org
+    state: present
+
+- name: Hold the mongodb to prevent update
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  with_items:
+    - mongodb-org
+    - mongodb-org-database
+    - mongodb-org-server
+    - mongodb-mongosh
+    - mongodb-org-mongos
+    - mongodb-org-tools
+
+- name: Install pymongo in remote mongodb
+  ansible.builtin.pip:
+    name:
+      - pymongo
+    state: present
+
+- name: Restart  and Enable mongod.service
+  ansible.builtin.systemd:
+    name: mongod
+    enabled: true
+    state: restarted

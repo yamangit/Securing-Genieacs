@@ -1,0 +1,15 @@
+# Create the test key file mongodb-test-client.key
+openssl genrsa -out /home/{{ ansible_user }}/test/mongodb-test-client.key 4096
+
+# Create the test certificate signing request mongodb-test-client.csr
+openssl req -new -key /home/{{ ansible_user }}/test/mongodb-test-client.key -out /home/{{ ansible_user }}/test/mongodb-test-client.csr -config /home/{{ ansible_user }}/test/openssl-client.cnf
+
+# Create the test client certificate mongodb-test-client.crt
+openssl x509 -sha256 -req -days 365 -in /home/{{ ansible_user }}/test/mongodb-test-client.csr -CA /home/{{ ansible_user }}/test/mongodb-test-ia.crt -CAkey /home/{{ ansible_user }}/test/mongodb-test-ia.key -CAcreateserial -out mongodb-test-client.crt -extfile openssl-client.cnf -extensions v3_req
+
+# Create the test PEM file for the client.
+cat /home/{{ ansible_user }}/test/mongodb-test-client.crt /home/{{ ansible_user }}/test/mongodb-test-client.key > /home/{{ ansible_user }}/test/test-client.pem
+
+# Checking the client key
+# echo "Testing Client Key"
+# mongosh --tls --host localhost --tlsCertificateKeyFile /home/{{ ansible_user }}/test/test-client.pem  --tlsCAFile /home/{{ ansible_user }}/test/test-ca.pem

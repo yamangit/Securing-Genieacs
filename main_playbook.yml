@@ -1,0 +1,28 @@
+---
+- name: Install mongodb
+  hosts: mongodb
+  gather_facts: true
+  become: true
+  roles:
+    - install-mongodb
+
+- name: Install Genieacs
+  hosts: acs
+  gather_facts: true
+  become: true
+  roles:
+    - install-genieacs
+
+- name: Securing mongodb
+  hosts: mongodb
+  gather_facts: true
+  become: true
+  roles:
+    - securing_mongodb
+
+- name: Securing genieacs
+  hosts: mongodb
+  gather_facts: true
+  become: true
+  roles:
+    - securing_genieacs

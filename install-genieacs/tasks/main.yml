@@ -1,0 +1,241 @@
+- name: Update APT Cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install npm
+  ansible.builtin.apt:
+    name:
+      - npm
+      - ca-certificates
+      - curl
+      - gnupg
+      - net-tools
+    state: present
+    update_cache: true
+
+- name: Import node GPG key
+  ansible.builtin.apt_key:
+    keyring: /etc/apt/trusted.gpg.d/node.gpg
+    url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+    state: present
+
+- name: Add node Repository
+  ansible.builtin.apt_repository:
+    repo: "deb https://deb.nodesource.com/node_{{ NODE_VERSION }} nodistro main"
+    state: present
+    filename: nodejs
+- name: Uninstall old nodejs
+  ansible.builtin.apt:
+    name:
+      - nodejs
+      - libnode-dev
+    state: absent
+- name: Remove unnecessary packages and their configuration files
+  ansible.builtin.apt:
+    autoremove: true
+    purge: true
+    state: absent
+
+- name: Update APT Cache
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install nodejs
+  ansible.builtin.apt:
+    name:
+      - nodejs
+    state: present
+    update_cache: true
+
+- name: Check Node Version
+  ansible.builtin.command: "node --version"
+  changed_when: false
+  register: version
+
+- name: Display the Version
+  ansible.builtin.debug:
+    var: version
+
+- name: Install genieacs using npm
+  community.general.npm:
+    name: "genieacs@{{ GENIEACS_VERSION }}"
+    global: true
+  register: genieacs
+
+- name: Print Genieacs installation
+  ansible.builtin.debug:
+    var: genieacs
+
+- name: Create system user genieacs
+  ansible.builtin.user:
+    name: genieacs
+    system: true
+    createhome: false
+
+- name: Create /opt/genieacs directory
+  ansible.builtin.file:
+    path: /opt/genieacs
+    state: directory
+    mode: "0755"
+    owner: root
+    group: root
+
+- name: Create /opt/genieacs/ext directory
+  ansible.builtin.file:
+    path: /opt/genieacs/ext
+    state: directory
+    mode: "0755"
+    owner: genieacs
+    group: genieacs
+
+- name: Create /var/log/genieacs directory
+  ansible.builtin.file:
+    path: /var/log/genieacs
+    state: directory
+    owner: genieacs
+    group: genieacs
+    mode: "0755"
+
+- name: Copy the env file to acs server
+  ansible.builtin.template:
+    src: genieacs.env.j2
+    dest: /opt/genieacs/genieacs.env
+    mode: "0600"
+    owner: genieacs
+    group: genieacs
+
+- name: Generate JWT secret
+  ansible.builtin.shell: >
+    node -e "console.log(\"GENIEACS_UI_JWT_SECRET=\" + require('crypto').randomBytes(128).toString('hex'))"
+  register: jwt_secret_output
+  changed_when: false
+
+- name: Print jwt_secret_output
+  ansible.builtin.debug:
+    var: jwt_secret_output.stdout
+
+- name: Append JWT secret to genieacs.env
+  ansible.builtin.lineinfile:
+    path: /opt/genieacs/genieacs.env
+    line: "{{ item }}"
+  loop:
+    - "{{ jwt_secret_output.stdout }}"
+
+- name: Create a systemd service file for genieacs-cwmp
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=GenieACS CWMP
+      After=network.target
+
+      [Service]
+      User=genieacs
+      EnvironmentFile=/opt/genieacs/genieacs.env
+      ExecStart=/usr/bin/genieacs-cwmp
+
+      [Install]
+      WantedBy=default.target
+    dest: /etc/systemd/system/genieacs-cwmp.service
+    mode: "0644"
+
+- name: Create a systemd service file for genieacs-nbi
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=GenieACS NBI
+      After=network.target
+
+      [Service]
+      User=genieacs
+      EnvironmentFile=/opt/genieacs/genieacs.env
+      ExecStart=/usr/bin/genieacs-nbi
+
+      [Install]
+      WantedBy=default.target
+    dest: /etc/systemd/system/genieacs-nbi.service
+    mode: "0644"
+
+- name: Create a systemd service file for genieacs-fs
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=GenieACS FS
+      After=network.target
+
+      [Service]
+      User=genieacs
+      EnvironmentFile=/opt/genieacs/genieacs.env
+      ExecStart=/usr/bin/genieacs-fs
+
+      [Install]
+      WantedBy=default.target
+    dest: /etc/systemd/system/genieacs-fs.service
+    mode: "0644"
+
+- name: Create a systemd service file for genieacs-ui
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      Description=GenieACS UI
+      After=network.target
+
+      [Service]
+      User=genieacs
+      EnvironmentFile=/opt/genieacs/genieacs.env
+      ExecStart=/usr/bin/genieacs-ui
+
+      [Install]
+      WantedBy=default.target
+    dest: /etc/systemd/system/genieacs-ui.service
+    mode: "0644"
+
+- name: Create log rotation configuration file
+  ansible.builtin.copy:
+    content: |
+      /var/log/genieacs/*.log /var/log/genieacs/*.yaml {
+          daily
+          rotate 30
+          compress
+          delaycompress
+          dateext
+      }
+    dest: /etc/logrotate.d/genieacs
+    mode: "0644"
+
+- name: Enable all required services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+  loop:
+    - genieacs-cwmp
+    - genieacs-nbi
+    - genieacs-fs
+    - genieacs-ui
+  register: enabled_data
+
+- name: Start all required services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+  loop:
+    - genieacs-cwmp
+    - genieacs-nbi
+    - genieacs-fs
+    - genieacs-ui
+
+- name: Check the status of all services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+  loop:
+    - genieacs-cwmp
+    - genieacs-nbi
+    - genieacs-fs
+    - genieacs-ui
+  register: service_status
+
+- name: Display the status of services
+  ansible.builtin.debug:
+    var: item.stdout
+  loop:
+    - "{{ enabled_data }}"
+    - "{{ service_status }}"

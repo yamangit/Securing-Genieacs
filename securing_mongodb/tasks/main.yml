@@ -1,0 +1,123 @@
+- name: Create MongoDB user
+  community.mongodb.mongodb_user:
+    database: genieacs
+    name: genieacs
+    password: "{{ GENIEACS_PASSWORD }}"
+    roles:
+      - readWrite
+
+- name: Copy the Template files
+  ansible.builtin.template:
+    src: "{{ lookup('env', 'PWD') }}/securing_mongodb/templates/mongod.conf.j2"
+    dest: /etc/mongod.conf
+    backup: true
+    mode: "0644"
+    owner: root
+    group: root
+    remote_src: false
+
+- name: Create /etc/ssl directory and give permission to mongodb
+  ansible.builtin.file:
+    path: /etc/ssl
+    state: directory
+    owner: mongodb
+    group: mongodb
+    mode: "0755"
+
+- name: Assemble MongoDB Key and Certificate into PEM
+  ansible.builtin.assemble:
+    src: /etc/ssl
+    dest: /etc/ssl/mongo.pem
+    owner: mongodb
+    group: mongodb
+    mode: "0644"
+    regexp: 'mongo\.(crt|key)$'
+
+- name: Start Mongodb service
+  ansible.builtin.systemd:
+    name: mongod
+    state: restarted
+
+- name: Create folder test
+  ansible.builtin.file:
+    path: /home/{{ ansible_user }}/test
+    state: directory
+    group: "{{ ansible_user }}"
+    owner: "{{ ansible_user }}"
+    mode: "0755"
+
+- name: Copying the configuration and script files
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/home/{{ ansible_user }}/test/"
+    mode: "0644"
+  loop:
+    - securing_mongodb/templates/openssl-ca.cnf.j2
+    - securing_mongodb/templates/openssl-server.cnf.j2
+    - securing_mongodb/templates/openssl-client.cnf.j2
+    - securing_mongodb/templates/openssl-ca.sh.j2
+    - securing_mongodb/templates/openssl-server.sh.j2
+    - securing_mongodb/templates/openssl-client.sh.j2
+
+- name: Rename files in a directory
+  ansible.builtin.command: "mv /home/{{ ansible_user }}/test/{{ item.src }} /home/{{ ansible_user }}/test/{{ item.dest }}"
+  loop:
+    - { src: "openssl-ca.cnf.j2", dest: "openssl-ca.cnf" }
+    - { src: "openssl-server.cnf.j2", dest: "openssl-server.cnf" }
+    - { src: "openssl-client.cnf.j2", dest: "openssl-client.cnf" }
+    - { src: "openssl-ca.sh.j2", dest: "openssl-ca.sh" }
+    - { src: "openssl-server.sh.j2", dest: "openssl-server.sh" }
+    - { src: "openssl-client.sh.j2", dest: "openssl-client.sh" }
+  changed_when: false
+
+- name: Change .sh file to executable
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/test/{{ item }}"
+    mode: "+x"
+  loop:
+    - "openssl-ca.sh"
+    - "openssl-server.sh"
+    - "openssl-client.sh"
+
+- name: Run the CA generation script with expect
+  ansible.builtin.expect:
+    command: "bash /home/{{ ansible_user }}/test/{{ item }}"
+    responses:
+      "NP \\[NP\\]": "\n"
+      "Bagmati \\[Bagmati\\]": "\n"
+      "Kathmandu \\[Kathmandu\\]": "\n"
+      "Yaman Lab \\[Yaman Lab\\]": "\n"
+      "Security \\[Security\\]": "\n"
+      "Yaman Singh Rana \\[\\]": "\n"
+  loop:
+    - "openssl-ca.sh"
+    - "openssl-server.sh"
+    - "openssl-client.sh"
+  args:
+    chdir: "/home/{{ ansible_user }}/test/"
+
+- name: Copy mongodb SSL
+  ansible.builtin.copy:
+    src: "/home/{{ ansible_user }}/test/{{ item.src }}"
+    dest: "/etc/ssl/{{ item.dest }}"
+    mode: "0644"
+    remote_src: true
+  loop:
+    - { src: "test-server.pem", dest: "mongodb-server.pem"}
+    - { src: "test-ca.pem", dest: "mongodb-server-ca.pem"}
+
+- name: Providing the required permission for SSL
+  ansible.builtin.file:
+    path: "{{ item }}"
+    recurse: true
+    owner: mongodb
+    group: mongodb
+    mode: "0755"
+  loop:
+    - "/var/lib/mongodb"
+    - "/var/lib/mongodb/WiredTiger*"
+
+- name: Restart Mongod service
+  ansible.builtin.service:
+    name: mongod
+    state: restarted

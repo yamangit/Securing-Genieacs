@@ -1,0 +1,82 @@
+- name: Create /opt/genieacs/ssl folder
+  ansible.builtin.file:
+    path: "/opt/genieacs/ssl"
+    state: directory
+    owner: genieacs
+    group: genieacs
+    mode: "0755"
+
+- name: Copying SSL certficate corresponds to every components of genieacs
+  ansible.builtin.copy:
+    src: "/home/{{ ansible_user }}/test/{{ item.src }}"
+    dest: "/opt/genieacs/ssl/{{ item.dest }}"
+    owner: genieacs
+    group: genieacs
+    mode: "0644"
+    remote_src: true
+  loop:
+    - { src: "mongodb-test-server.key", dest: "genieacs-ui.key" }
+    - { src: "mongodb-test-server.crt", dest: "genieacs-ui.crt" }
+    - { src: "mongodb-test-server.key", dest: "genieacs-fs.key" }
+    - { src: "mongodb-test-server.crt", dest: "genieacs-fs.crt" }
+    - { src: "mongodb-test-server.key", dest: "genieacs-nbi.key" }
+    - { src: "mongodb-test-server.crt", dest: "genieacs-nbi.crt" }
+    - { src: "mongodb-test-server.key", dest: "genieacs-cwmp.key" }
+    - { src: "mongodb-test-server.crt", dest: "genieacs-cwmp.crt" }
+    - { src: "test-ca.pem", dest: "mongodb-server-ca.pem" }
+    - { src: "test-client.pem", dest: "mongodb-client.pem" }
+  changed_when: false
+
+- name: Replace SSL certificates in genieacs.env
+  ansible.builtin.lineinfile:
+    path: /opt/genieacs/genieacs.env
+    regexp: "{{ item.old_line }}"
+    line: "{{ item.new_line }}"
+    insertafter: "{{ item.insert_after | default('EOF') }}"
+  loop:
+    - {
+        old_line: "^GENIEACS_NBI_SSL_KEY=.*",
+        new_line: "GENIEACS_NBI_SSL_KEY=/opt/genieacs/ssl/genieacs-nbi.key",
+      }
+    - {
+        old_line: "^GENIEACS_NBI_SSL_CERT=.*",
+        new_line: "GENIEACS_NBI_SSL_CERT=/opt/genieacs/ssl/genieacs-nbi.crt",
+      }
+    - {
+        old_line: "^GENIEACS_CWMP_SSL_KEY=.*",
+        new_line: "GENIEACS_CWMP_SSL_KEY=/opt/genieacs/ssl/genieacs-cwmp.key",
+      }
+    - {
+        old_line: "^GENIEACS_CWMP_SSL_CERT=.*",
+        new_line: "GENIEACS_CWMP_SSL_CERT=/opt/genieacs/ssl/genieacs-cwmp.crt",
+      }
+    - {
+        old_line: "^GENIEACS_FS_SSL_KEY=.*",
+        new_line: "GENIEACS_FS_SSL_KEY=/opt/genieacs/ssl/genieacs-fs.key",
+      }
+    - {
+        old_line: "^GENIEACS_FS_SSL_CERT=.*",
+        new_line: "GENIEACS_FS_SSL_CERT=/opt/genieacs/ssl/genieacs-fs.crt",
+      }
+    - {
+        old_line: "^GENIEACS_UI_SSL_KEY=.*",
+        new_line: "GENIEACS_UI_SSL_KEY=/opt/genieacs/ssl/genieacs-ui.key",
+      }
+    - {
+        old_line: "^GENIEACS_UI_SSL_CERT=.*",
+        new_line: "GENIEACS_UI_SSL_CERT=/opt/genieacs/ssl/genieacs-ui.crt",
+      }
+    - {
+        old_line: "^GENIEACS_MONGODB_CONNECTION_URL=.*",
+        new_line: "GENIEACS_MONGODB_CONNECTION_URL={{ MONGODB_URL }}",
+      }
+
+- name: Restart all services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - "genieacs-ui"
+    - "genieacs-fs"
+    - "genieacs-nbi"
+    - "genieacs-cwmp"

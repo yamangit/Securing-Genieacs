@@ -1,0 +1,15 @@
+# Create the test key file mongodb-test-server.key
+openssl genrsa -out /home/{{ ansible_user }}/test/mongodb-test-server.key 4096
+
+# Create the test certificate signing request mongodb-test-server.csr
+openssl req -new -key /home/{{ ansible_user }}/test/mongodb-test-server.key -out /home/{{ ansible_user }}/test/mongodb-test-server.csr -config /home/{{ ansible_user }}/test/openssl-server.cnf
+
+# Create the test server certificate mongodb-test-server.crt
+openssl x509 -sha256 -req -days 3650 -in /home/{{ ansible_user }}/test/mongodb-test-server.csr -CA /home/{{ ansible_user }}/test/mongodb-test-ia.crt -CAkey /home/{{ ansible_user }}/test/mongodb-test-ia.key -CAcreateserial -out /home/{{ ansible_user }}/test/mongodb-test-server.crt -extfile /home/{{ ansible_user }}/test/openssl-server.cnf -extensions v3_req
+
+# Create the test PEM file for the server
+cat /home/{{ ansible_user }}/test/mongodb-test-server.crt /home/{{ ansible_user }}/test/mongodb-test-server.key > /home/{{ ansible_user }}/test/test-server.pem
+
+# Testint ehe server certificate
+#  echo "Testing the certificate"
+# mongod --tlsMode requireTLS --tlsCertificateKeyFile /home/{{ ansible_user }}/test/test-server.pem  --tlsCAFile /home/{{ ansible_user }}/test/test-ca.pem

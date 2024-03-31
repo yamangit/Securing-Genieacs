@@ -1,0 +1,2 @@
+GENIEACS_SSL_COPY_COMMAND: "cp /home/{{ ansible_user }}/test/{{ item.src1 }} /opt/genieacs/ssl/{{ item.dest1 }} || cp /home/{{ ansible_user }}/test/{{ item.src2 }} /opt/genieacs/ssl/{{ item.dest2 }}"
+GENIEACS_PASSWORD: "GQzuBVEw0bT22Z962XZsVD8"
